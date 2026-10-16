@@ -1,0 +1,1 @@
+import {StudentManager} from "../managers";import {requireRole} from "@/lib/auth";export default async function Page(){await requireRole("admin");return <main className="mx-auto max-w-6xl px-5 py-10"><a href="/admin" className="text-teal-700">? Dashboard</a><h1 className="my-6 text-3xl font-semibold">Students</h1><StudentManager/></main>}
