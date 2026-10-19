@@ -1,0 +1,11 @@
+quiz_title,category,difficulty,question,type,option_a,option_b,option_c,option_d,correct,explanation
+World Science Basics,Science,Easy,"Which planet is known as the Red Planet?",MCQ,Venus,Mars,Jupiter,Mercury,Mars,Iron oxide gives Mars its reddish appearance.
+World Science Basics,Science,Easy,"What gas do plants absorb during photosynthesis?",MCQ,Oxygen,Nitrogen,Carbon dioxide,Hydrogen,Carbon dioxide,Plants use carbon dioxide to make sugars during photosynthesis.
+World Science Basics,Science,Easy,"What is the chemical symbol for water?",MCQ,CO2,H2O,O2,NaCl,H2O,A water molecule contains two hydrogen atoms and one oxygen atom.
+World Science Basics,Science,Easy,"How many bones are in a typical adult human body?",MCQ,106,206,306,406,206,Most adults have 206 bones.
+World Science Basics,Science,Easy,"Which force pulls objects toward Earth?",MCQ,Friction,Magnetism,Gravity,Tension,Gravity,Gravity attracts objects with mass.
+World Science Basics,Science,Easy,"Sound generally travels faster through water than through air.",TRUE_FALSE,,,,,True,Sound travels faster in water because its molecules are closer together.
+World Science Basics,Science,Easy,"What is the center of an atom called?",MCQ,Electron,Nucleus,Orbit,Cell,Nucleus,The nucleus contains protons and neutrons.
+World Science Basics,Science,Easy,"Which organ pumps blood around the body?",MCQ,Liver,Lung,Heart,Kidney,Heart,The heart circulates blood throughout the body.
+World Science Basics,Science,Easy,"At standard pressure water boils at 100 degrees Celsius.",TRUE_FALSE,,,,,True,Water boils at 100 degrees Celsius at sea level.
+World Science Basics,Science,Easy,"Which of these is a renewable energy source?",MCQ,Coal,Solar,Diesel,Natural gas,Solar,Sunlight is naturally replenished.

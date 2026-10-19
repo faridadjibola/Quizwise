@@ -11,7 +11,7 @@ Quizwise is a Next.js App Router application with a Supabase Postgres, Auth, and
 ## Configure Supabase
 
 1. Create a Supabase project and copy its project URL, anon key, and service-role key.
-2. Apply every SQL migration in `supabase/migrations/`, in filename order, using the Supabase SQL editor or the Supabase CLI. The migrations create the app schema, RLS policies, and the public `question-images` bucket. The bucket allows public image reads and restricts uploads, updates, and deletes to active admins.
+2. Apply every SQL migration in `supabase/migrations/`, in filename order, using the Supabase SQL editor or the Supabase CLI. The migrations create the app schema, quiz metadata, RLS policies, and the public `question-images` bucket. The bucket allows public image reads and restricts uploads, updates, and deletes to active admins.
 3. In the Supabase Auth settings, configure the allowed site URL and redirect URLs for your local and deployed app origins.
 4. Copy `.env.example` to `.env.local` and set the required values:
 
@@ -55,7 +55,15 @@ set role = 'admin'
 where email = 'you@example.com';
 ```
 
-Alternatively, set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in your local environment and run `npm run seed`. The seed script creates a sample administrator, two quizzes, and 20 questions. Use a unique, strong password and do not use the sample account in production.
+Alternatively, set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in your local environment and run `npm run seed`. The seed script creates or updates a sample administrator, five published quizzes across different categories, and 25 questions. Use a unique, strong password and do not use the sample account in production.
+
+## Import quizzes
+
+Apply the quiz metadata and question-type migrations (`0004_quiz_metadata.sql` and `0005_multi_select_questions.sql`) before importing. Sign in with an active admin account and open **Admin → Quizzes → Upload quizzes**. CSV, XLSX, and JSON files up to 5 MB are accepted. Uploading only validates and previews the file; the Import as draft action saves valid rows as unpublished quizzes.
+
+The CSV columns are `quiz_title,category,difficulty,question,type,option_a,option_b,option_c,option_d,correct,explanation`. Difficulty is Easy, Medium, or Hard. Question type is MCQ, TRUE_FALSE, or MULTI_SELECT. Leave TRUE_FALSE option columns empty and use True or False as the correct answer. For MULTI_SELECT, separate correct option texts with `|`. Rows with the same quiz title are grouped into a single draft quiz; category and difficulty must be consistent within a quiz. Invalid rows must be fixed by uploading a corrected file or explicitly skipped before import.
+
+Download [the 10-question sample CSV](./public/sample-quizzes.csv) or use the authenticated template download in the upload page.
 
 ## Deploy with Docker Compose
 
