@@ -5,6 +5,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Flag, Timer } from "lucide-react";
+import { AccountMenu } from "@/app/account-menu";
+import { GoogleSignInButton } from "@/app/google-sign-in";
+import { useAuth } from "@/app/providers";
 
 type Question = {
   id: string;
@@ -15,8 +18,13 @@ type Question = {
 };
 
 type QuizData = {
-  quiz: { id: string; title: string; time_limit_minutes: number };
+  quiz: { id: string; title: string; time_limit_minutes: number; pass_mark: number };
   questions: Question[];
+};
+
+type GuestResult = {
+  score: number;
+  passed: boolean;
 };
 
 type SavedState = {
@@ -37,6 +45,8 @@ export default function Runner({ id }: { id: string }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [flags, setFlags] = useState<Record<string, boolean>>({});
   const [attempt, setAttempt] = useState("");
+  const [guestMode, setGuestMode] = useState(false);
+  const [guestResult, setGuestResult] = useState<GuestResult | null>(null);
   const [index, setIndex] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
@@ -44,6 +54,7 @@ export default function Runner({ id }: { id: string }) {
   const saveQueue = useRef(Promise.resolve());
   const submitRef = useRef<() => void>(() => {});
   const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
     let active = true;
@@ -53,6 +64,17 @@ export default function Runner({ id }: { id: string }) {
         const quizResponse = await fetch(`/api/quiz/${id}`);
         const quizData = await readResponse<QuizData>(quizResponse);
         if (!active) return;
+
+        const authResponse = await fetch("/api/auth/me", { cache: "no-store" });
+        if (authResponse.status === 401) {
+          setData(quizData);
+          setGuestMode(true);
+          setAnswers({});
+          setFlags({});
+          setSeconds(quizData.quiz.time_limit_minutes * 60);
+          return;
+        }
+        await readResponse<{ user: unknown }>(authResponse);
 
         const storageKey = `quiz-${id}`;
         const savedText = localStorage.getItem(storageKey);
@@ -82,6 +104,7 @@ export default function Runner({ id }: { id: string }) {
         const answers = saved.answers ?? {};
         const flags = saved.flags ?? {};
         setData(quizData);
+        setGuestMode(false);
         setAttempt(attemptId);
         setAnswers(answers);
         setFlags(flags);
@@ -119,6 +142,7 @@ export default function Runner({ id }: { id: string }) {
       nextAnswers: Record<string, string>,
       nextFlags: Record<string, boolean>,
     ) => {
+      if (guestMode) return true;
       if (!attempt) return false;
 
       const storageKey = `quiz-${id}`;
@@ -155,37 +179,45 @@ export default function Runner({ id }: { id: string }) {
         return false;
       }
     },
-    [attempt, id],
+    [attempt, guestMode, id],
   );
 
   const submit = useCallback(async () => {
-    if (!attempt || !data || busy) return;
+    if ((!attempt && !guestMode) || !data || busy || guestResult) return;
     setBusy(true);
     setError("");
 
     try {
-      await saveQueue.current;
-      if (seconds > 0) {
-        for (const question of data.questions) {
-          const response = await fetch("/api/attempt/answer", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              attemptId: attempt,
+      if (guestMode) {
+        const response = await fetch("/api/attempt/guest-score", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            quizId: id,
+            answers: data.questions.map((question) => ({
               questionId: question.id,
               answer: answers[question.id] ?? null,
               flagged: Boolean(flags[question.id]),
-            }),
-          });
-          if (response.status === 409) break;
-          await readResponse<{ saved: boolean }>(response);
-        }
+            })),
+          }),
+        });
+        setGuestResult(await readResponse<GuestResult>(response));
+        setBusy(false);
+        return;
       }
 
+      await saveQueue.current;
       const response = await fetch("/api/attempt/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ attemptId: attempt }),
+        body: JSON.stringify({
+          attemptId: attempt,
+          answers: data.questions.map((question) => ({
+            questionId: question.id,
+            answer: answers[question.id] ?? null,
+            flagged: Boolean(flags[question.id]),
+          })),
+        }),
       });
       await readResponse(response);
       localStorage.removeItem(`quiz-${id}`);
@@ -194,7 +226,38 @@ export default function Runner({ id }: { id: string }) {
       setError(cause instanceof Error ? cause.message : "Could not submit the quiz.");
       setBusy(false);
     }
-  }, [answers, attempt, busy, data, flags, id, router, seconds]);
+  }, [answers, attempt, busy, data, flags, guestMode, guestResult, id, router]);
+
+  async function saveGuestAttempt(signedInUser = user) {
+    if (!guestResult || !data || busy || !signedInUser) return;
+    setBusy(true);
+    setError("");
+    try {
+      const startResponse = await fetch("/api/attempt/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quizId: id }),
+      });
+      const started = await readResponse<{ id: string }>(startResponse);
+      const submitResponse = await fetch("/api/attempt/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attemptId: started.id,
+          answers: data.questions.map((question) => ({
+            questionId: question.id,
+            answer: answers[question.id] ?? null,
+            flagged: Boolean(flags[question.id]),
+          })),
+        }),
+      });
+      await readResponse(submitResponse);
+      router.replace(`/result/${started.id}`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not save your results.");
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     submitRef.current = () => {
@@ -203,7 +266,7 @@ export default function Runner({ id }: { id: string }) {
   }, [submit]);
 
   useEffect(() => {
-    if (!attempt || !data) return;
+    if ((!attempt && !guestMode) || !data || guestResult) return;
     const timer = window.setInterval(() => {
       setSeconds((remaining) => {
         if (remaining <= 1) {
@@ -215,7 +278,7 @@ export default function Runner({ id }: { id: string }) {
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [attempt, data]);
+  }, [attempt, data, guestMode, guestResult]);
 
   if (error && !data) {
     return (
@@ -225,8 +288,44 @@ export default function Runner({ id }: { id: string }) {
       </main>
     );
   }
-  if (!data || !attempt) {
+  if (!data || (!attempt && !guestMode)) {
     return <main className="mx-auto max-w-2xl p-10 text-slate-500">Loading your quiz...</main>;
+  }
+  if (guestResult) {
+    return (
+      <main className="min-h-screen bg-slate-50 px-4 py-8">
+        <div className="mx-auto max-w-3xl">
+          <header className="flex items-center justify-between">
+            <Link href="/quizzes" className="font-semibold">Quizwise</Link>
+            <AccountMenu />
+          </header>
+          <section className="mt-8 rounded-3xl bg-white p-8 shadow-sm">
+            <p className="text-sm uppercase tracking-widest text-slate-500">Quiz complete</p>
+            <h1 className="mt-2 text-4xl font-semibold">{guestResult.score}%</h1>
+            <p className={`mt-2 font-medium ${guestResult.passed ? "text-emerald-700" : "text-rose-700"}`}>
+              {guestResult.passed ? "Passed" : "Not passed"}
+            </p>
+            <h2 className="mt-8 text-xl font-semibold">Sign in to save your results.</h2>
+            <p className="mt-2 text-slate-600">Your answers are kept on this page until you sign in.</p>
+            <div className="mt-4">
+              {user ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void saveGuestAttempt()}
+                  className="rounded-full bg-teal-700 px-5 py-3 font-medium text-white disabled:opacity-50"
+                >
+                  {busy ? "Saving results…" : "Save my results"}
+                </button>
+              ) : (
+                <GoogleSignInButton onLogin={(signedInUser) => void saveGuestAttempt(signedInUser)} />
+              )}
+            </div>
+            {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
+          </section>
+        </div>
+      </main>
+    );
   }
   const question = data.questions[index];
   if (!question) {
@@ -257,10 +356,13 @@ export default function Runner({ id }: { id: string }) {
       <div className="mx-auto max-w-3xl">
         <header className="flex items-center justify-between">
           <Link href="/quizzes" className="font-semibold">Quizwise</Link>
-          <span className={`flex items-center gap-2 rounded-full px-4 py-2 font-mono ${seconds < 60 ? "bg-red-100 text-red-700" : "bg-white"}`}>
-            <Timer aria-hidden="true" size={16} />
-            {minutes}:{remainingSeconds}
-          </span>
+          <div className="flex items-center gap-3">
+            <AccountMenu />
+            <span className={`flex items-center gap-2 rounded-full px-4 py-2 font-mono ${seconds < 60 ? "bg-red-100 text-red-700" : "bg-white"}`}>
+              <Timer aria-hidden="true" size={16} />
+              {minutes}:{remainingSeconds}
+            </span>
+          </div>
         </header>
         <div className="mt-8 h-2 overflow-hidden rounded bg-slate-200">
           <div
@@ -352,6 +454,7 @@ export default function Runner({ id }: { id: string }) {
             <button
               key={item.id}
               type="button"
+              disabled={busy}
               onClick={() => setIndex(itemIndex)}
               aria-label={`Go to question ${itemIndex + 1}${flags[item.id] ? ", flagged for review" : ""}`}
               aria-current={itemIndex === index ? "step" : undefined}
@@ -368,7 +471,9 @@ export default function Runner({ id }: { id: string }) {
           ))}
         </div>
         <p className="mt-4 text-center text-xs text-slate-500">
-          Your answers save as you go. You can return to this page after a refresh.
+          {guestMode
+            ? "Your guest answers stay on this page. Sign in after finishing to save your results."
+            : "Your answers save as you go. You can return to this page after a refresh."}
         </p>
       </div>
     </main>

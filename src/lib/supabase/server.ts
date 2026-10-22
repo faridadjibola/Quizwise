@@ -11,6 +11,7 @@ export async function createClient() {
   }
 
   return createServerClient(url, key, {
+    cookieOptions: { secure: process.env.NODE_ENV === "production" },
     cookies: {
       getAll() {
         return jar.getAll();

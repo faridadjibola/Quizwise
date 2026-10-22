@@ -13,7 +13,7 @@ Quizwise is a Next.js App Router application with a Supabase Postgres, Auth, and
 1. Create a Supabase project and copy its project URL, anon key, and service-role key.
 2. Apply every SQL migration in `supabase/migrations/`, in filename order, using the Supabase SQL editor or the Supabase CLI. The migrations create the app schema, quiz metadata, RLS policies, and the public `question-images` bucket. The bucket allows public image reads and restricts uploads, updates, and deletes to active admins.
 3. In the Supabase Auth settings, configure the allowed site URL and redirect URLs for your local and deployed app origins.
-4. Copy `.env.example` to `.env.local` and set the required values:
+4. Create `.env.local` and set the required values:
 
 | Variable | Required | Purpose |
 |---|---|---|
@@ -22,8 +22,39 @@ Quizwise is a Next.js App Router application with a Supabase Postgres, Auth, and
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server-only key for protected reads, scoring, and health checks. Never expose it to the browser. |
 | `SEED_ADMIN_EMAIL` | Only for seeding | Email address for the optional sample administrator. |
 | `SEED_ADMIN_PASSWORD` | Only for seeding | Strong password for the optional sample administrator. |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | For Google sign-in | Google OAuth Web client ID; included in the browser bundle. |
+| `ADMIN_EMAILS` | Optional | Comma-separated email addresses promoted to admins at sign-in. |
 
 Do not commit real environment files or expose the service-role key through a `NEXT_PUBLIC_` variable.
+
+Example variable names and safe placeholders:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
+ADMIN_EMAILS=admin@example.com
+```
+
+## Google sign-in
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), create an OAuth client with application type **Web application**.
+2. Add `http://localhost:3000` and your deployed app origin (for example, `https://your-app.vercel.app`) as **Authorized JavaScript origins**.
+3. In Supabase, open **Authentication → Sign In / Providers → Google**, enable Google, and enter the OAuth client ID and client secret. Copy the Web client ID into `NEXT_PUBLIC_GOOGLE_CLIENT_ID` in `.env.local`.
+4. In the Google OAuth client, add the Supabase callback URL shown in the Google provider settings (typically `https://<project-ref>.supabase.co/auth/v1/callback`) as an **Authorized redirect URI**. In Supabase URL configuration, allow `http://localhost:3000/**` and the deployed origin's callback paths, and set the deployed origin as the production Site URL.
+5. Set `ADMIN_EMAILS` to a comma-separated list of trusted, verified email addresses, such as `you@example.com,another-admin@example.com`. Those accounts receive the `admin` profile role when they sign in; other new accounts remain students. Existing manually assigned admins are not demoted.
+6. Apply `supabase/migrations/0006_google_auth_profiles.sql` after the earlier migrations. Configure `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `ADMIN_EMAILS`, and the existing Supabase variables in the Vercel project's environment settings for the relevant environments, then redeploy so the client ID is included in the frontend bundle.
+
+The app uses Supabase Auth's signed cookie session, with `SameSite=Lax` and `Secure` enabled in production. Supabase's browser client needs access to its session cookies, but session tokens are not stored in localStorage. The same-origin `/api/auth/google`, `/api/auth/me`, and `/api/auth/logout` handlers rely on Supabase Auth for ID-token validation and cookie/session lifecycle. Admin page and API guards read the active profile role from the database on each request.
+
+Manual smoke test after configuring Google and applying migrations:
+
+1. Sign in with Google and verify the header shows your name/avatar.
+2. Refresh and verify the account menu remains signed in.
+3. Sign out and verify protected result pages return to sign-in.
+4. Open `/admin` with a non-admin account and verify the friendly “Admins only” page.
+5. Finish a quiz as a guest, verify the score and “Sign in to save your results” prompt, then sign in and verify the saved result appears in My results.
 
 ## Run locally
 

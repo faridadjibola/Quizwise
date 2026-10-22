@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AccountMenu } from "../account-menu";
 
 type Quiz = {
   id: string;
@@ -99,9 +100,8 @@ export default function ExploreQuizzes({
           <Link href="/" className="text-xl font-bold">
             Quizwise
           </Link>
-          <nav aria-label="Main navigation" className="flex gap-5">
-            <Link href="/history">My results</Link>
-            <Link href="/admin">Admin</Link>
+          <nav aria-label="Main navigation" className="flex items-center gap-5">
+            <AccountMenu />
           </nav>
         </header>
 

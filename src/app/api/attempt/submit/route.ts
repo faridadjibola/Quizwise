@@ -2,7 +2,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireActiveStudent } from "@/lib/api-auth";
 
-const schema = z.object({ attemptId: z.string().uuid() });
+const schema = z.object({
+  attemptId: z.string().uuid(),
+  answers: z.array(
+    z.object({
+      questionId: z.string().uuid(),
+      answer: z.string().max(1000).nullable(),
+      flagged: z.boolean().default(false),
+    }),
+  ).max(500).optional(),
+});
 
 type QuizQuestion = {
   id: string;
@@ -50,13 +59,43 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "This quiz has no questions." }, { status: 409 });
     }
 
-    const { data: answers, error: answersError } = await db
-      .from("attempt_answers")
-      .select("question_id,answer,flagged")
-      .eq("attempt_id", attempt.id);
-    if (answersError) throw answersError;
-
-    const answersByQuestion = new Map((answers ?? []).map((answer) => [answer.question_id, answer]));
+    const answersByQuestion = new Map<
+      string,
+      { answer: string | null; flagged: boolean }
+    >();
+    if (parsed.data.answers) {
+      const assignedQuestions = new Map(
+        rows.map((row) => {
+          const question = Array.isArray(row.questions) ? row.questions[0] : row.questions;
+          return [question.id, question.options as string[]];
+        }),
+      );
+      for (const answer of parsed.data.answers) {
+        const options = assignedQuestions.get(answer.questionId);
+        if (!options || (answer.answer !== null && !options.includes(answer.answer))) {
+          return NextResponse.json({ error: "An answer is invalid for this quiz." }, { status: 400 });
+        }
+        if (answersByQuestion.has(answer.questionId)) {
+          return NextResponse.json({ error: "Duplicate answers are not allowed." }, { status: 400 });
+        }
+        answersByQuestion.set(answer.questionId, {
+          answer: answer.answer,
+          flagged: answer.flagged,
+        });
+      }
+    } else {
+      const { data: answers, error: answersError } = await db
+        .from("attempt_answers")
+        .select("question_id,answer,flagged")
+        .eq("attempt_id", attempt.id);
+      if (answersError) throw answersError;
+      for (const answer of answers ?? []) {
+        answersByQuestion.set(answer.question_id, {
+          answer: answer.answer,
+          flagged: answer.flagged,
+        });
+      }
+    }
     let points = 0;
     let total = 0;
     const review = rows.map((row) => {

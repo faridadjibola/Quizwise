@@ -4,11 +4,26 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { GoogleSignInButton } from "./google-sign-in";
+import { useAuth } from "./providers";
+import type { AuthUser } from "@/lib/auth-user";
 
-export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+export function AuthForm({ mode, next }: { mode: "login" | "signup"; next?: string }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const router = useRouter();
+  const { refreshUser } = useAuth();
+  const returnTo = (role?: AuthUser["role"]) => {
+    if (next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")) {
+      return next;
+    }
+    return role === "admin" ? "/admin" : "/quizzes";
+  };
+
+  function finishSignIn(user?: AuthUser | null) {
+    router.replace(returnTo(user?.role));
+    router.refresh();
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,6 +51,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         if (!result.data.session) {
           setError("Check your email to confirm your account, then sign in.");
         } else {
+          await refreshUser();
           router.push("/quizzes");
         }
         return;
@@ -59,7 +75,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       } else if (!profile.is_active) {
         setError("Your account is inactive. Please contact an administrator.");
       } else {
-        router.replace(profile.role === "admin" ? "/admin" : "/quizzes");
+        const currentUser = await refreshUser();
+        finishSignIn(currentUser);
       }
     } catch (cause) {
       console.error("Authentication failed", cause);
@@ -83,6 +100,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             ? "Sign in to continue your learning."
             : "Join to practice and track your progress."}
         </p>
+        <div className="mt-6">
+          <GoogleSignInButton onLogin={finishSignIn} />
+          <p className="mt-5 text-center text-sm text-slate-500">or continue with email</p>
+        </div>
         <form onSubmit={submit} className="mt-8 space-y-4">
           {mode === "signup" && (
             <label className="block text-sm">
