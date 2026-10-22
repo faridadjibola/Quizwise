@@ -18,11 +18,11 @@ export function GoogleSignInButton({
   const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
   if (!clientId) {
-    return (
-      <p className="text-sm text-slate-600">
-        Google sign-in is not configured. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID to enable it.
-      </p>
-    );
+    if (process.env.NODE_ENV === "development") {
+      console.warn("Google sign-in is hidden because NEXT_PUBLIC_GOOGLE_CLIENT_ID is not configured.");
+      return <p className="text-sm text-slate-600">Google sign-in is unavailable in this development environment.</p>;
+    }
+    return null;
   }
 
   return (

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./providers";
-import { GoogleSignInButton } from "./google-sign-in";
 
 export function AccountMenu() {
   const { user, loading, error: authError, logout } = useAuth();
@@ -35,9 +34,11 @@ export function AccountMenu() {
   if (!user) {
     return (
       <div className="flex flex-col items-end gap-1">
-        <GoogleSignInButton onLogin={() => router.refresh()} width={180} />
-        <Link href={`/login?next=${encodeURIComponent(pathname || "/quizzes")}`} className="text-xs text-teal-700">
-          Other sign-in options
+        <Link
+          href={`/login?next=${encodeURIComponent(pathname || "/quizzes")}`}
+          className="rounded-lg px-3 py-2 text-sm font-medium text-teal-800 hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700"
+        >
+          Sign in
         </Link>
         {authError && <span role="status" className="text-xs text-amber-800">{authError}</span>}
       </div>

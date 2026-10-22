@@ -93,12 +93,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user, loading, error, login, logout, refreshUser],
   );
 
-  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "google-client-id-not-configured";
-  return (
-    <GoogleOAuthProvider clientId={clientId}>
-      <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-    </GoogleOAuthProvider>
-  );
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const content = <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return clientId ? <GoogleOAuthProvider clientId={clientId}>{content}</GoogleOAuthProvider> : content;
 }
 
 export function useAuth() {

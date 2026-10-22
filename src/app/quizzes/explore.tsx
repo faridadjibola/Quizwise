@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AccountMenu } from "../account-menu";
+import { SiteHeader } from "../site-header";
 
 type Quiz = {
   id: string;
@@ -96,14 +96,7 @@ export default function ExploreQuizzes({
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
       <div className="mx-auto max-w-6xl">
-        <header className="flex justify-between">
-          <Link href="/" className="text-xl font-bold">
-            Quizwise
-          </Link>
-          <nav aria-label="Main navigation" className="flex items-center gap-5">
-            <AccountMenu />
-          </nav>
-        </header>
+        <SiteHeader />
 
         <section className="mt-14" aria-labelledby="explore-heading">
           <p className="text-sm uppercase tracking-widest text-teal-700">
