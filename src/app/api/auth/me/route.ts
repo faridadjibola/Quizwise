@@ -12,10 +12,15 @@ export async function GET() {
     const auth = await createClient();
     const { data, error } = await auth.auth.getUser();
     if (error) {
-      console.error("Auth session lookup failed", error.message);
+      const unauthenticated =
+        error.name === "AuthSessionMissingError" ||
+        error.name === "AuthInvalidJwtError" ||
+        error.status === 400 ||
+        error.status === 401;
+      if (!unauthenticated) console.error("Auth session lookup failed", error.message);
       return NextResponse.json(
-        { error: "Unable to verify your session." },
-        { status: error.status === 401 ? 401 : 503, headers: noStore },
+        { error: unauthenticated ? "Sign in required." : "Unable to verify your session." },
+        { status: unauthenticated ? 401 : 503, headers: noStore },
       );
     }
     if (!data.user) {
